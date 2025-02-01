@@ -4,9 +4,14 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <map>
+#include <conio.h>
 
 namespace fs = std::filesystem;
 using namespace std;
+
+map<int, string> changedFiles;
+int changeCount = 0;
 
 void monitorDirectory(const string& directoryPath, bool& stopFlag) {
     wstring wideDirectoryPath = wstring(directoryPath.begin(), directoryPath.end());
@@ -44,7 +49,12 @@ void monitorDirectory(const string& directoryPath, bool& stopFlag) {
             FILE_NOTIFY_INFORMATION* fni = (FILE_NOTIFY_INFORMATION*)buffer;
             do {
                 wstring fileName(fni->FileName, fni->FileNameLength / sizeof(WCHAR));
-                cout << "Change detected in " << directoryPath << ": " << string(fileName.begin(), fileName.end()) << endl;
+                string filePath = directoryPath + "\\" + string(fileName.begin(), fileName.end());
+
+                changeCount++;
+                changedFiles[changeCount] = filePath;
+
+                cout << "[" << changeCount << "] Change detected: " << filePath << endl;
 
                 fni = fni->NextEntryOffset ? (FILE_NOTIFY_INFORMATION*)((BYTE*)fni + fni->NextEntryOffset) : NULL;
             } while (fni);
@@ -59,6 +69,7 @@ void monitorAllDrives(bool& stopFlag) {
     vector<thread> threads;
 
     cout << "Starting automatic monitoring of all drives..." << endl;
+    cout << "Press 'W' to stop monitoring." << endl;
 
     for (const string& drive : drives) {
         if (fs::exists(drive)) {
@@ -66,9 +77,15 @@ void monitorAllDrives(bool& stopFlag) {
         }
     }
 
-    cout << "Press Enter to stop monitoring." << endl;
-    cin.get();
-    stopFlag = true;
+    while (!stopFlag) {
+        if (_kbhit()) {
+            char key = _getch();
+            if (key == 'W' || key == 'w') {
+                stopFlag = true;
+                break;
+            }
+        }
+    }
 
     for (auto& t : threads) {
         if (t.joinable()) {
@@ -77,6 +94,17 @@ void monitorAllDrives(bool& stopFlag) {
     }
 
     cout << "Monitoring stopped." << endl;
+
+    if (!changedFiles.empty()) {
+        cout << "Enter the number of the changed file to open its folder (or 0 to exit): ";
+        int choice;
+        cin >> choice;
+        if (choice > 0 && changedFiles.count(choice)) {
+            string filePath = changedFiles[choice];
+            string command = "explorer /select,\"" + filePath + "\"";
+            system(command.c_str());
+        }
+    }
 }
 
 int main() {
@@ -85,7 +113,7 @@ int main() {
 
     cout << "Choose an option:" << endl;
     cout << "1. Manually specify a directory to monitor." << endl;
-    cout << "2. Automatically monitor all drives for changes. (requires a powerful pc)" << endl;
+    cout << "2. Automatically monitor all drives for changes. (requires a powerful PC)" << endl;
     cout << "Enter your choice (1 or 2): ";
     cin >> choice;
     cin.ignore();
