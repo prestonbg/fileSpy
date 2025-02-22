@@ -26,8 +26,6 @@ System Requirements
 
 Windows/Linux/macOS
 
-Python (if implemented in Python) or required runtime environment
-
 
 Warnings & Disclaimer
 
